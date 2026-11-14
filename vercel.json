@@ -9,7 +9,10 @@
       "maxDuration": 30
     }
   },
-  "rewrites": [
-    {"source": "/:path*", "destination": "/api/index?__ss_path=/:path*"}
+  "routes": [
+    {
+      "src": "/(.*)",
+      "dest": "/api/index?__ss_path=/$1"
+    }
   ]
 }
