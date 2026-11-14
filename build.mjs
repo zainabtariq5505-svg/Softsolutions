@@ -1,0 +1,10 @@
+import fs from 'node:fs/promises';
+await fs.mkdir('dist/server',{recursive:true});
+for(const [name,input] of [['styles','styles.css'],['client','client.js'],['config','config.js']])await fs.writeFile('src/'+name+'-text.js','export default '+JSON.stringify(await fs.readFile('src/'+input,'utf8'))+';');
+let config=await fs.readFile('src/config.js','utf8');let render=(await fs.readFile('src/render.js','utf8')).replace(/^import .*;\r?\n/gm,'');let worker=(await fs.readFile('src/worker.js','utf8')).replace(/^import .*;\r?\n/gm,'');
+let premium=(await fs.readFile('src/premium.js','utf8')).replace(/^import .*;\r?\n/gm,'');
+let regionPicker=(await fs.readFile('src/region-picker.js','utf8')).replace(/^import .*;\r?\n/gm,'');
+const strings=await Promise.all(['styles','client','config'].map(async n=>`const ${n==='config'?'configuration':n}=${JSON.stringify(await fs.readFile('src/'+(n==='styles'?'styles.css':n+'.js'),'utf8')+(n==='client'?'\n'+await fs.readFile('src/ribbon.js','utf8'):'')+(n==='styles'?'\n'+await fs.readFile('src/premium.css','utf8')+'\n'+await fs.readFile('src/refinements.css','utf8')+'\n'+await fs.readFile('src/region-picker.css','utf8')+'\n'+await fs.readFile('src/monochrome.css','utf8'):''))};`));
+const assets={};for(const name of ['aurel','forma','soft-solutions-logo-gold','soft-solutions-icon-gold'])assets['/assets/'+name+'.webp']=(await fs.readFile('assets/'+name+'.webp')).toString('base64');
+await fs.writeFile('src/assets-text.js','export default '+JSON.stringify(assets)+';');
+await fs.writeFile('dist/server/index.js',config+'\n'+regionPicker+'\n'+premium+'\n'+render+'\n'+strings.join('\n')+'\nconst imageAssets='+JSON.stringify(assets)+';\n'+worker);console.log('Built Worker: '+(await fs.stat('dist/server/index.js')).size+' bytes');

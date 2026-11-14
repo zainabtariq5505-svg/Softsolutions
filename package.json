@@ -1,0 +1,1 @@
+{"name":"soft-solutions","private":true,"type":"module","scripts":{"build":"node build.mjs","dev":"node preview.mjs","test":"node test.mjs"}}
