@@ -1,5 +1,6 @@
 import fs from 'node:fs/promises';
 await fs.mkdir('dist/server',{recursive:true});
+await fs.mkdir('public',{recursive:true});
 for(const [name,input] of [['styles','styles.css'],['client','client.js'],['config','config.js']])await fs.writeFile('src/'+name+'-text.js','export default '+JSON.stringify(await fs.readFile('src/'+input,'utf8'))+';');
 let config=await fs.readFile('src/config.js','utf8');let render=(await fs.readFile('src/render.js','utf8')).replace(/^import .*;\r?\n/gm,'');let worker=(await fs.readFile('src/worker.js','utf8')).replace(/^import .*;\r?\n/gm,'');
 let premium=(await fs.readFile('src/premium.js','utf8')).replace(/^import .*;\r?\n/gm,'');

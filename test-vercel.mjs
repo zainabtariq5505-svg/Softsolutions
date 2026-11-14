@@ -1,0 +1,13 @@
+import assert from 'node:assert/strict';
+import app from './api/index.js';
+const call=(path,options={})=>app.fetch(new Request('https://example.vercel.app/api/index?__ss_path='+encodeURIComponent(path),options));
+for(const path of ['/','/services','/pricing','/contact','/about','/work/forma','/styles.css','/client.js','/config.js','/assets/soft-solutions-icon-gold.webp']) assert.equal((await call(path)).status,200,path);
+assert.equal((await call('/not-a-page')).status,404);
+const region=await call('/api/region',{headers:{'x-vercel-ip-country':'PK'}});assert.equal((await region.json()).region,'PK');
+process.env.LEAD_WEBHOOK_URL='https://formspree.io/f/example';
+assert.equal((await (await call('/api/status')).json()).inquiries,true);
+assert.match(await (await call('/contact')).text(),/Send project inquiry/);
+let forwarded;const original=globalThis.fetch;globalThis.fetch=async(url,options)=>{forwarded=JSON.parse(options.body);return new Response('{}',{status:200});};
+const inquiry=await call('/api/inquiry',{method:'POST',headers:{origin:'https://example.vercel.app','Content-Type':'application/json'},body:JSON.stringify({name:'Local test',email:'test@example.com',region:'PK',description:'Locally mocked project requirements.',elapsed:4000,consent:'on'})});
+assert.equal(inquiry.status,200);assert.equal(forwarded.message,'Locally mocked project requirements.');globalThis.fetch=original;delete process.env.LEAD_WEBHOOK_URL;
+console.log('Vercel adapter passed: routes, assets, country detection, live contact state, and mocked inquiry delivery.');

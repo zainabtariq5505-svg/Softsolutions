@@ -1,21 +1,38 @@
 # SOFT SOLUTIONS
 
-Dependency-free, server-rendered Cloudflare Worker website. Run `npm run build`, `npm test`, and `npm run dev` (localhost:4173).
+Black-and-white agency website with rotating SS monogram, regional pricing, concept portfolio, Calendly booking, and server-side Formspree inquiry handling.
 
-## Content and commercial setup
+## Local development
 
-- `src/config.js`: regional prices, service packages, FAQs, portfolio concepts, announcement, booking URL, public contact details, socials, and team data.
-- Prices are intentionally null until approved. Quote-required messaging is used throughout; no official prices are invented.
-- Every supported region has independent Foundation and Growth prices. Manual rates take priority. The price resolver accepts optional rates, but live conversion is disabled pending approval of a rate provider and base prices.
-- Approximate region suggestion uses Cloudflare's IP-derived country code, with Rest of World fallback. Manual selection persists in local storage.
-- Portfolio projects are original concepts; no client results are claimed.
+Requires Node.js 22. No third-party dependencies.
 
-## Lead integration
+    npm run build
+    npm test
+    npm run dev
 
-Add `LEAD_WEBHOOK_URL` as a hosted runtime secret containing your HTTPS CRM/email-automation endpoint, and optionally `LEAD_WEBHOOK_TOKEN`. The server forwards validated fields as JSON with bearer authorization when configured. Browser code never receives the token. Confirm that the endpoint durably accepts the inquiry and sends notifications. With no endpoint the form downloads a brief and explicitly says it was not sent.
+Open http://localhost:4173.
 
-The endpoint validates origin, body size, consent, required fields, honeypot, and minimum completion time. Before exposing to public traffic add provider-level rate limiting and Turnstile or equivalent anti-abuse verification. The initial deployment is private.
+## Deploy on Vercel
 
-## Before commercial launch
+1. Sign in to Vercel and import zainabtariq5505-svg/Softsolutions.
+2. Keep the repository root as Root Directory and Framework Preset as Other. The included vercel.json supplies the build command and routing.
+3. Under Environment Variables, add LEAD_WEBHOOK_URL with your Formspree endpoint. Enable it for Production and Preview as needed. Optionally add LEAD_WEBHOOK_TOKEN only if your lead provider requires bearer authorization.
+4. Deploy. Environment variables from the previous Sites hosting do not transfer automatically.
+5. Check /contact shows Send project inquiry, submit a real test inquiry, and verify receipt in Formspree and the destination inbox. Also test Calendly and regional pricing.
+6. Add your custom domain in Vercel project settings and apply the DNS records Vercel provides.
 
-Supply final regional prices, booking URL, approved client work, contact information, legal entity and privacy contact, retention terms, and team profiles. Update legal notices for the selected lead processor. Configure and test real inquiry delivery, booking, and anti-abuse controls. Enable an exchange-rate provider only if conversion fallback is desired. No CRM credentials or fabricated contact details are included.
+If no lead endpoint is configured, the form explicitly offers a downloadable brief instead of pretending to send an inquiry.
+
+## Architecture
+
+api/index.js adapts the existing Web Request/Response handler to Vercel Node.js Functions. vercel.json routes pages, assets, and API paths through it. The build embeds optimized images and front-end assets in dist/server/index.js. The public output folder is intentionally empty; this is a server-rendered application.
+
+Vercel's country header supplies approximate country detection; manual region selection remains persistent. The backend validates origin, required fields, body size, consent, a honeypot, and minimum completion time. No test submissions are sent by the automated tests; delivery is mocked.
+
+## Editable content
+
+src/config.js contains services, packages, regional prices, FAQs, booking URL, and project concepts. Prices remain Request a quote until approved. Concept projects are not client commissions. Live exchange-rate conversion is disabled.
+
+## Launch configuration
+
+Keep credentials in hosting environment variables, never in Git. Confirm your legal entity, business contact, privacy contact and retention policy before commercial launch. Configure suitable public-traffic anti-abuse controls and verify real inquiry delivery. No payments are collected by this website.

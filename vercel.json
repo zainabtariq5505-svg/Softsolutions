@@ -1,0 +1,15 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": null,
+  "buildCommand": "npm run build",
+  "outputDirectory": "public",
+  "functions": {
+    "api/index.js": {
+      "includeFiles": "dist/server/index.js",
+      "maxDuration": 30
+    }
+  },
+  "rewrites": [
+    {"source": "/:path*", "destination": "/api/index?__ss_path=/:path*"}
+  ]
+}
