@@ -1,7 +1,7 @@
 // All Supabase calls are server-side. Staff requests use their own JWT and RLS.
 const crmStages = ['new','contacted','proposal','won','lost'];
 function crmReady(env) { return Boolean(env.SUPABASE_URL && env.SUPABASE_PUBLISHABLE_KEY); }
-function crmIntakeReady(env) { return crmReady(env) && Boolean(env.SUPABASE_SECRET_KEY); }
+function crmIntakeReady(env) { return crmReady(env) && Boolean(env.SUPABASE_INTAKE_SECRET); }
 function crmReply(data,status=200,extra={}) {
   return new Response(JSON.stringify(data),{status,headers:{'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store','X-Content-Type-Options':'nosniff',...extra}});
 }
@@ -11,7 +11,7 @@ async function crmSupabase(env,path,options={},token) {
   return fetch(new URL(path,base),{...options,headers:{apikey:env.SUPABASE_PUBLISHABLE_KEY,...(token?{Authorization:'Bearer '+token}:{}),'Content-Type':'application/json',...options.headers},signal:AbortSignal.timeout(10000)});
 }
 async function crmSaveInquiry(env,lead) {
-  const result=await crmSupabase(env,'/rest/v1/crm_leads',{method:'POST',headers:{apikey:env.SUPABASE_SECRET_KEY,...(env.SUPABASE_SECRET_KEY.startsWith('eyJ')?{Authorization:'Bearer '+env.SUPABASE_SECRET_KEY}:{}),Prefer:'return=minimal'},body:JSON.stringify({...lead,source:'website',consent_at:new Date().toISOString()})});
+  const result=await crmSupabase(env,'/functions/v1/crm-inquiry',{method:'POST',headers:{'x-crm-intake-key':env.SUPABASE_INTAKE_SECRET},body:JSON.stringify(lead)});
   if(!result.ok) throw Error('CRM intake failed');
 }
 async function crmJson(request) {

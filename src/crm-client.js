@@ -1,6 +1,6 @@
 const el=id=>document.getElementById(id);
 const stageNames={new:'New',contacted:'Contacted',proposal:'Proposal',won:'Won',lost:'Lost'};
-const serviceNames={'website-development':'Website development','shopify-development':'Shopify development','digital-marketing':'Digital marketing','branding-creative':'Branding & creative','growth-automation':'Growth & automation',custom:'Custom partnership'};
+const serviceNames={'video-editing':'High-End Video Editing','website-development':'Website development','shopify-development':'Shopify development','digital-marketing':'Digital marketing','branding-creative':'Branding & creative','growth-automation':'Growth & automation',custom:'Custom partnership'};
 let leads=[],offset=0,total=0,selected=null,loading=false;
 try{document.documentElement.dataset.theme=localStorage.getItem('ss-crm-theme')||'dark';}catch{}
 function themeLabel(){el('theme').setAttribute('aria-label','Switch to '+(document.documentElement.dataset.theme==='dark'?'light':'dark')+' theme');}themeLabel();

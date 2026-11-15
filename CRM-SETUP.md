@@ -14,7 +14,7 @@ Add these to the existing project. Keep both keys in Vercel environment variable
 
 - `SUPABASE_URL`: `https://jjdawdxoovispaduzzgu.supabase.co`
 - `SUPABASE_PUBLISHABLE_KEY`: the project's publishable key (or legacy anon key).
-- `SUPABASE_SECRET_KEY`: the project's secret key (or legacy service_role key). Mark this Sensitive. It is used only to insert website inquiries server-side.
+- `SUPABASE_INTAKE_SECRET`: a random 256-bit server-only intake token. Its SHA-256 hash is pinned in the Supabase crm-inquiry Edge Function. The database master key stays inside Supabase. Rotate the Vercel token and deployed function hash together.
 
 Keep `LEAD_WEBHOOK_URL` to retain Formspree email notifications. If the CRM is configured, the database save must succeed before an inquiry is acknowledged. A mail notification failure after a successful database save does not ask the visitor to resubmit. Existing Formspree submissions are not automatically imported. If no Supabase keys are present, Formspree delivery keeps working and `/crm` displays a configuration message.
 

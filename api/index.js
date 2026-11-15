@@ -14,7 +14,7 @@ export default {
     return worker.fetch(forwarded, {
       SUPABASE_URL: process.env.SUPABASE_URL,
       SUPABASE_PUBLISHABLE_KEY: process.env.SUPABASE_PUBLISHABLE_KEY,
-      SUPABASE_SECRET_KEY: process.env.SUPABASE_SECRET_KEY,
+      SUPABASE_INTAKE_SECRET: process.env.SUPABASE_INTAKE_SECRET,
       LEAD_WEBHOOK_URL: process.env.LEAD_WEBHOOK_URL,
       LEAD_WEBHOOK_TOKEN: process.env.LEAD_WEBHOOK_TOKEN,
     });
