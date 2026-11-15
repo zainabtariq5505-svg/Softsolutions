@@ -27,6 +27,9 @@ Deno.serve(async req=>{
  }else if(operation==='reminders.finish'){
  if(!/^[a-f0-9-]{36}$/.test(d.reminder_id||'')||typeof d.was_sent!=='boolean')return reply({error:'Invalid reminder'},400);
  rpc='crm_finish_reminder';params={reminder_id:d.reminder_id,was_sent:d.was_sent,provider_message_id:typeof d.provider_id==='string'?d.provider_id.slice(0,200):null};
+ }else if(operation==='portal'){
+ const p=d.payload||{};if(!/^[a-f0-9]{64}$/.test(p.token_hash||'')||!['view','message','approve','decision'].includes(p.action))return reply({error:'Invalid portal request'},400);
+ rpc='crm_portal';params={payload:{token_hash:p.token_hash,action:p.action,name:String(p.name||'').slice(0,100),body:String(p.body||'').slice(0,3000),id:p.id,status:p.status}};
  }else if(operation==='maintenance'){rpc='crm_expire_ip';params={};
  }else return reply({error:'Unknown operation'},400);
  const master=Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');if(!master)return reply({error:'Intake unavailable'},503);

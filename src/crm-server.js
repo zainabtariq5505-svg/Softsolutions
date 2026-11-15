@@ -47,6 +47,7 @@ async function crmRoute(request,env,path) {
   const user=await userResult.json();
   const member=await crmSupabase(env,'/rest/v1/crm_staff?select=user_id&user_id=eq.'+encodeURIComponent(user.id),{},token);
   if(!member.ok || !(await member.json()).length) return crmReply({error:'CRM access is restricted to authorized staff.'},403);
+  const studio=await studioRoute(request,env,path,token);if(studio)return studio;
   const feature=await crmFeatureRoute(request,env,path,token);if(feature)return feature;
   if(path==='/api/crm/me' && request.method==='GET') return crmReply({email:user.email});
   if(path==='/api/crm/summary' && request.method==='GET') {
