@@ -29,3 +29,5 @@ Only explicit `crm_staff` members can view or update leads. Public visitors cann
 Before wider rollout, configure managed rate limiting/challenge protection on the public inquiry and login endpoints. Current inquiry protection includes origin checks, bounded payloads, validation, a honeypot, and minimum completion time; these do not replace rate limiting. Set a retention policy and the agency's legal privacy contact before processing live leads. Production database migrations should be backed up and reviewed before future changes.
 
 Validation: `npm run build` then `npm test`. No external messages or live test inquiries are sent by tests.
+
+See CRM-TRACKING.md for live updates, attribution, proposal tracking, Calendly webhooks, and Gmail email reminders.

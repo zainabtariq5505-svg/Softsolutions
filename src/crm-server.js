@@ -47,6 +47,7 @@ async function crmRoute(request,env,path) {
   const user=await userResult.json();
   const member=await crmSupabase(env,'/rest/v1/crm_staff?select=user_id&user_id=eq.'+encodeURIComponent(user.id),{},token);
   if(!member.ok || !(await member.json()).length) return crmReply({error:'CRM access is restricted to authorized staff.'},403);
+  const feature=await crmFeatureRoute(request,env,path,token);if(feature)return feature;
   if(path==='/api/crm/me' && request.method==='GET') return crmReply({email:user.email});
   if(path==='/api/crm/summary' && request.method==='GET') {
     const result=await crmSupabase(env,'/rest/v1/rpc/crm_summary',{method:'POST',body:'{}'},token);
@@ -66,8 +67,14 @@ async function crmRoute(request,env,path) {
   if(/^\/api\/crm\/leads\/[a-f0-9-]{36}$/.test(path) && request.method==='PATCH') {
     let d;try{d=await crmJson(request);}catch{return crmReply({error:'Invalid request'},400);}
     if(!crmStages.includes(d.stage)||typeof d.notes!=='string'||d.notes.length>20000||typeof d.updated_at!=='string'||!Number.isFinite(Date.parse(d.updated_at))||(d.follow_up_at!==null && (typeof d.follow_up_at!=='string'||!Number.isFinite(Date.parse(d.follow_up_at))))) return crmReply({error:'Check your stage, notes, and follow-up date.'},400);
+    const proposal={};
+    for(const [key,max] of [['proposal_title',200],['proposal_url',1000]])if(d[key]!==undefined){if(typeof d[key]!=='string'||d[key].length>max)return crmReply({error:'Invalid proposal details'},400);proposal[key]=d[key].trim();}
+    if(proposal.proposal_url){try{if(new URL(proposal.proposal_url).protocol!=='https:')throw Error();}catch{return crmReply({error:'Proposal link must use HTTPS'},400);}}
+    if(d.proposal_status!==undefined){if(!crmProposalStates.includes(d.proposal_status))return crmReply({error:'Invalid proposal status'},400);proposal.proposal_status=d.proposal_status;}
+    if(d.proposal_currency!==undefined){if(typeof d.proposal_currency!=='string'||! /^(USD|PKR|GBP|AED|EUR|CAD|AUD)$/.test(d.proposal_currency))return crmReply({error:'Invalid proposal currency'},400);proposal.proposal_currency=d.proposal_currency;}
+    if(d.proposal_amount!==undefined){if(d.proposal_amount!==null&&(typeof d.proposal_amount!=='number'||!Number.isFinite(d.proposal_amount)||d.proposal_amount<0||d.proposal_amount>9999999999.99||Math.abs(d.proposal_amount*100-Math.round(d.proposal_amount*100))>0.00001))return crmReply({error:'Enter a valid proposal amount with up to two decimal places'},400);proposal.proposal_amount=d.proposal_amount;}
     const query=new URLSearchParams({id:'eq.'+path.split('/').pop(),updated_at:'eq.'+d.updated_at,select:'*'});
-    const result=await crmSupabase(env,'/rest/v1/crm_leads?'+query,{method:'PATCH',headers:{Prefer:'return=representation'},body:JSON.stringify({stage:d.stage,notes:d.notes,follow_up_at:d.follow_up_at})},token);
+    const result=await crmSupabase(env,'/rest/v1/crm_leads?'+query,{method:'PATCH',headers:{Prefer:'return=representation'},body:JSON.stringify({stage:d.stage,notes:d.notes,follow_up_at:d.follow_up_at,...proposal})},token);
     if(!result.ok) return crmReply({error:'Unable to save this lead.'},502);
     const rows=await result.json();if(!rows.length)return crmReply({error:'This lead changed in another session. Close and refresh before editing again.'},409);
     return crmReply({lead:rows[0]});
