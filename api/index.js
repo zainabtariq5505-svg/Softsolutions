@@ -12,6 +12,9 @@ export default {
     const forwarded = new Request(url, request);
     Object.defineProperty(forwarded, 'cf', {value:{country:request.headers.get('x-vercel-ip-country') || ''}});
     return worker.fetch(forwarded, {
+      SUPABASE_URL: process.env.SUPABASE_URL,
+      SUPABASE_PUBLISHABLE_KEY: process.env.SUPABASE_PUBLISHABLE_KEY,
+      SUPABASE_SECRET_KEY: process.env.SUPABASE_SECRET_KEY,
       LEAD_WEBHOOK_URL: process.env.LEAD_WEBHOOK_URL,
       LEAD_WEBHOOK_TOKEN: process.env.LEAD_WEBHOOK_TOKEN,
     });

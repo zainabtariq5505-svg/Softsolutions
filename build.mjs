@@ -9,5 +9,7 @@ let regionPicker=(await fs.readFile('src/region-picker.js','utf8')).replace(/^im
 const strings=await Promise.all(['styles','client','config'].map(async n=>`const ${n==='config'?'configuration':n}=${JSON.stringify(await fs.readFile('src/'+(n==='styles'?'styles.css':n+'.js'),'utf8')+(n==='client'?'\n'+await fs.readFile('src/ribbon.js','utf8'):'')+(n==='styles'?'\n'+await fs.readFile('src/premium.css','utf8')+'\n'+await fs.readFile('src/refinements.css','utf8')+'\n'+await fs.readFile('src/region-picker.css','utf8')+'\n'+await fs.readFile('src/monochrome.css','utf8'):''))};`));
 const assets={};for(const name of ['aurel','forma','soft-solutions-logo-gold','soft-solutions-icon-gold'])assets['/assets/'+name+'.webp']=(await fs.readFile('assets/'+name+'.webp')).toString('base64');
 await fs.writeFile('src/assets-text.js','export default '+JSON.stringify(assets)+';');
-await fs.writeFile('dist/server/index.js',config+'\n'+regionPicker+'\n'+premium+'\n'+render+'\n'+strings.join('\n')+'\nconst imageAssets='+JSON.stringify(assets)+';\n'+worker);console.log('Built Worker: '+(await fs.stat('dist/server/index.js')).size+' bytes');
+const crmCode=await fs.readFile('src/crm-server.js','utf8');
+const crmStrings=(await Promise.all([['crmHTML','crm.html'],['crmCSS','crm.css'],['crmClient','crm-client.js']].map(async ([name,file])=>'const '+name+'='+JSON.stringify(await fs.readFile('src/'+file,'utf8'))+';'))).join('\n');
+await fs.writeFile('dist/server/index.js',crmCode+'\n'+crmStrings+'\n'+config+'\n'+regionPicker+'\n'+premium+'\n'+render+'\n'+strings.join('\n')+'\nconst imageAssets='+JSON.stringify(assets)+';\n'+worker);console.log('Built Worker: '+(await fs.stat('dist/server/index.js')).size+' bytes');
 

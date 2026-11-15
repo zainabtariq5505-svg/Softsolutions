@@ -5,7 +5,7 @@
   "scripts": {
     "build": "node build.mjs",
     "dev": "node preview.mjs",
-    "test": "node test.mjs && node test-vercel.mjs"
+    "test": "node test.mjs && node test-vercel.mjs && node test-crm.mjs"
   },
   "engines": {
     "node": "22.x"
