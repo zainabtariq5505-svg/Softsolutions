@@ -11,7 +11,7 @@ async function studioReload(quiet=false){if(!authenticated||studioBusy)return;st
 async function studioOpenLead(id){try{openLead((await api('leads/'+id)).lead);}catch(e){se(e.message);}}
 function studioTask(list,title,detail,fn){const li=sn('li');li.append(sb(title,fn,'lead-open'),sn('span',detail));list.append(li);}
 function studioEmpty(list,text){if(!list.children.length)list.append(sn('li',text,'quiet-empty'));}
-async function studioToday(){const start=new Date();start.setHours(0,0,0,0);const end=new Date(start);end.setDate(end.getDate()+1);const data=await api('studio/today?'+new URLSearchParams({start:start.toISOString(),end:end.toISOString()}));
+async function studioToday(){const start=new Date();start.setHours(0,0,0,0);const end=new Date(start);end.setDate(end.getDate()+1);const data=await api('studio/today?'+new URLSearchParams({start:start.toISOString(),end:end.toISOString(),day:[start.getFullYear(),String(start.getMonth()+1).padStart(2,'0'),String(start.getDate()).padStart(2,'0')].join('-')}));
  el('today-date').textContent=start.toLocaleDateString(undefined,{weekday:'long',day:'numeric',month:'long'});
  for(const [key,label] of [['new_today','New leads today'],['overdue','Overdue follow-ups'],['active_projects','Active projects'],['proposals_pending','Proposals awaiting a decision']]){const card=el('today-'+key);card.querySelector('strong').textContent=data[key]??0;card.querySelector('span').textContent=label;}
  el('today-value').textContent=data.pipeline_value.length?data.pipeline_value.map(v=>money(v.amount,v.currency)).join(' / '):'No published proposals awaiting a decision';

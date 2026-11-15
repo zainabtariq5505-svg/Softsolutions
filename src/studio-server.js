@@ -14,8 +14,8 @@ async function studioRoute(request,env,path,token){
  const bad=message=>crmReply({error:message},400),get=(table,q)=>studioRest(env,token,table,q);
  try{
  if(part[0]==='today'&&method==='GET'){
- const start=url.searchParams.get('start'),end=url.searchParams.get('end');if(!studioStamp(start)||!studioStamp(end)||Date.parse(end)-Date.parse(start)<20*3600000||Date.parse(end)-Date.parse(start)>28*3600000)return bad('Invalid day range');
- const result=await crmSupabase(env,'/rest/v1/rpc/crm_today',{method:'POST',body:JSON.stringify({day_start:start,day_end:end})},token);if(!result.ok)throw Error();return crmReply(await result.json());
+ const start=url.searchParams.get('start'),end=url.searchParams.get('end'),day=url.searchParams.get('day');if(!studioDate(day)||!studioStamp(start)||!studioStamp(end)||Date.parse(end)-Date.parse(start)<20*3600000||Date.parse(end)-Date.parse(start)>28*3600000)return bad('Invalid day range');
+ const result=await crmSupabase(env,'/rest/v1/rpc/crm_today',{method:'POST',body:JSON.stringify({day_start:start,day_end:end,local_day:day})},token);if(!result.ok)throw Error();return crmReply(await result.json());
  }
  if(part[0]==='pipeline'&&method==='GET'){
  const stage=url.searchParams.get('stage');if(!crmStages.includes(stage))return bad('Choose a pipeline stage');

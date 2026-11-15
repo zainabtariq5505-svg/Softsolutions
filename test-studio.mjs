@@ -29,6 +29,7 @@ try{
  proposal.items[0].qty=0;assert.equal((await call('/api/crm/studio/proposals','POST',proposal)).status,400);proposal.items[0].qty=2;
  r=await call('/api/crm/studio/proposals/'+did+'/print');const html=await r.text();assert.equal(r.status,200);assert.ok(!html.includes('<script>proposal'));assert.match(html,/&lt;script&gt;proposal/);assert.match(html,/PKR/);assert.match(html,/251/);assert.equal(r.headers.get('cache-control'),'no-store');
  r=await call('/api/crm/studio/proposals/'+did+'/publish','POST',{updated_at:doc.updated_at});assert.equal(r.status,200);const publication=calls.findLast(c=>c.url.includes('/crm_proposals'));assert.deepEqual(JSON.parse(publication.o.body),{status:'sent'});assert.match(publication.url,/status=eq.draft/);
+ r=await call('/api/crm/studio/today?start=2026-11-15T08:00:00Z&end=2026-11-16T08:00:00Z&day=2026-11-15');assert.equal(r.status,200);assert.equal(JSON.parse(calls.findLast(c=>c.url.includes('/rpc/crm_today')).o.body).local_day,'2026-11-15');
  for(const service of ['website-development','branding-creative','video-editing']){r=await worker.fetch(new Request(base+'/services/'+service));const page=await r.text();assert.equal(r.status,200);assert.match(page,/service-delivery-grid/);assert.match(page,/https:\/\/calendly.com\/softsolutionsagencypk\/30min/);assert.ok(!page.includes('/work/null'));}
  console.log('Studio passed: staff/origin gates, stage conflicts, hashed client links, portal validation, proposal amounts/publication locking, escaped print views, and service pages.');
 }finally{globalThis.fetch=original;}
