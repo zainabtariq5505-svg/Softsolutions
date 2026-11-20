@@ -8,7 +8,7 @@ let premium=(await fs.readFile('src/service-details.js','utf8')+'\n'+await fs.re
 let regionPicker=(await fs.readFile('src/region-picker.js','utf8')).replace(/^import .*;\r?\n/gm,'');
 const strings=await Promise.all(['styles','client','config'].map(async n=>`const ${n==='config'?'configuration':n}=${JSON.stringify(await fs.readFile('src/'+(n==='styles'?'styles.css':n+'.js'),'utf8')+(n==='client'?'\n'+await fs.readFile('src/ribbon.js','utf8'):'')+(n==='styles'?'\n'+await fs.readFile('src/premium.css','utf8')+'\n'+await fs.readFile('src/refinements.css','utf8')+'\n'+await fs.readFile('src/region-picker.css','utf8')+'\n'+await fs.readFile('src/monochrome.css','utf8')+'\n'+await fs.readFile('src/service-details.css','utf8'):''))};`));
 const assets={};for(const name of ['aurel','forma','soft-solutions-logo-gold','soft-solutions-icon-gold'])assets['/assets/'+name+'.webp']=(await fs.readFile('assets/'+name+'.webp')).toString('base64');
-for(const name of ['forma','aurel','orbit'])assets['/assets/cover-'+name+'.jpg']=(await fs.readFile('assets/cover-'+name+'.jpg')).toString('base64');
+for(const name of ['forma','aurel','orbit','fatima-study-advisor'])assets['/assets/cover-'+name+'.jpg']=(await fs.readFile('assets/cover-'+name+'.jpg')).toString('base64');
 const brandIcon=(await fs.readFile('assets/soft-solutions-monogram.jpeg')).toString('base64');
 const flagAssets={};for(const file of await fs.readdir('assets/flags'))if(/^[a-z]{2}\.svg$/.test(file))flagAssets['/flags/'+file]=(await fs.readFile('assets/flags/'+file)).toString('base64');
 await fs.writeFile('src/assets-text.js','export default '+JSON.stringify(assets)+';');
