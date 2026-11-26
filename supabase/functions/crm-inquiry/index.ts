@@ -1,5 +1,5 @@
 const EXPECTED_HASH='3423049513f3813275e47ccfe9708839e52efba922a34a4177645d4e51709b5a';
-const reply=(data,status=200)=>new Response(JSON.stringify(data),{status,headers:{'Content-Type':'application/json','Cache-Control':'no-store'}});
+const reply=(data: unknown,status=200)=>new Response(JSON.stringify(data),{status,headers:{'Content-Type':'application/json','Cache-Control':'no-store'}});
 Deno.serve(async req=>{
  if(req.method!=='POST')return reply({error:'Method not allowed'},405);
  const token=req.headers.get('x-crm-intake-key')||'';
@@ -17,9 +17,9 @@ Deno.serve(async req=>{
  if(operation==='inquiry'){
  if(typeof d.name!=='string'||!d.name.trim()||d.name.length>100||typeof d.email!=='string'||!/^\S+@\S+\.\S+$/.test(d.email)||d.email.length>200||typeof d.description!=='string'||d.description.length<20||d.description.length>5000)return reply({error:'Invalid inquiry'},400);
  const lead=Object.fromEntries(['name','email','company','website','region','service','budget','description'].map(k=>[k,String(d[k]||'').trim().slice(0,k==='description'?5000:500)]));
- const tracking=d.tracking||{};lead.tracking=Object.fromEntries(['ip','country','referrer_host','landing_path','utm_source','utm_medium','utm_campaign'].map(k=>[k,String(tracking[k]||'').slice(0,200)]));
- if(lead.tracking.country&&!/^[A-Z]{2}$/.test(lead.tracking.country))return reply({error:'Invalid country'},400);
- rpc='crm_receive_inquiry';params={payload:lead};
+ const tracking=d.tracking||{};const attribution=Object.fromEntries(['ip','country','referrer_host','landing_path','utm_source','utm_medium','utm_campaign'].map(k=>[k,String(tracking[k]||'').slice(0,200)]));
+ if(attribution.country&&!/^[A-Z]{2}$/.test(attribution.country))return reply({error:'Invalid country'},400);
+ rpc='crm_receive_inquiry';params={payload:{...lead,tracking:attribution}};
  }else if(operation==='calendly'){
  const b=d.booking||{};if(!['active','canceled'].includes(b.status)||typeof b.email!=='string'||!/^\S+@\S+\.\S+$/.test(b.email)||b.email.length>200||!/^https:\/\/api\.calendly\.com\//.test(b.invitee_uri||'')||!/^https:\/\/api\.calendly\.com\//.test(b.event_uri||''))return reply({error:'Invalid booking'},400);
  rpc='crm_receive_booking';params={payload:b};

@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import vm from 'node:vm';
+import ts from 'typescript';
 import crypto from 'node:crypto';
 import worker from './dist/server/index.js';
 import adapter from './api/index.js';
@@ -35,7 +36,7 @@ try{
  for(const k of Object.keys(env))delete process.env[k];
  // Execute the actual Edge Function source with synthetic secrets and a mocked database.
  let edgeHandler,edgeCall;const testSecret='a'.repeat(64),hash=crypto.createHash('sha256').update(testSecret).digest('hex');let edgeSource=await fs.readFile('supabase/functions/crm-inquiry/index.ts','utf8');edgeSource=edgeSource.replace(/const EXPECTED_HASH='[a-f0-9]+';/,"const EXPECTED_HASH='"+hash+"';");
- vm.runInNewContext(edgeSource,{Deno:{serve:fn=>edgeHandler=fn,env:{get:key=>key==='SUPABASE_URL'?'https://example.supabase.co':'mock-master-key'}},crypto:globalThis.crypto,Response,TextEncoder,TextDecoder,Uint8Array,AbortSignal,fetch:async(url,options)=>{edgeCall={url,options};return Response.json('mock-id');}});
+ vm.runInNewContext(ts.transpileModule(edgeSource,{compilerOptions:{target:ts.ScriptTarget.ES2022}}).outputText,{Deno:{serve:fn=>edgeHandler=fn,env:{get:key=>key==='SUPABASE_URL'?'https://example.supabase.co':'mock-master-key'}},crypto:globalThis.crypto,Response,TextEncoder,TextDecoder,Uint8Array,AbortSignal,fetch:async(url,options)=>{edgeCall={url,options};return Response.json('mock-id');}});
  const edgeReq=(d,secret=testSecret)=>new Request('https://edge.test',{method:'POST',headers:{'x-crm-intake-key':secret},body:JSON.stringify(d)});
  assert.equal((await edgeHandler(edgeReq({},'bad'))).status,401);assert.equal((await edgeHandler(edgeReq({operation:'arbitrary-sql'}))).status,400);assert.equal((await edgeHandler(edgeReq({operation:'reminders.claim'}))).status,200);assert.ok(edgeCall.url.endsWith('/crm_claim_reminders'));
  assert.equal((await edgeHandler(edgeReq({...inquiry,tracking:{ip:'203.0.113.8',country:'PK'}}))).status,200);assert.equal(JSON.parse(edgeCall.options.body).payload.tracking.country,'PK');
