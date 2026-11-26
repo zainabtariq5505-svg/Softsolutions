@@ -7,8 +7,57 @@ function themeLabel(){el('theme').setAttribute('aria-label','Switch to '+(docume
 el('theme').onclick=()=>{const next=document.documentElement.dataset.theme==='dark'?'light':'dark';document.documentElement.dataset.theme=next;try{localStorage.setItem('ss-crm-theme',next);}catch{}themeLabel();};
 function message(text,error=false){el('status').textContent=text;el('status').classList.toggle('error',error);}
 function stopLive(){live?.close();live=null;clearInterval(fallback);fallback=null;}
-function signedOut(){authenticated=false;stopLive();el('dashboard').hidden=true;el('login').hidden=false;el('logout').hidden=true;el('live-status').hidden=true;el('account').textContent='';leads=[];selected=null;historyVersion++;if(typeof studioProject!=='undefined'){studioProject=null;studioDirty=false;el('project-detail').hidden=true;el('project-index').hidden=false;el('client-link').value='';el('client-link-box').hidden=true;for(const id of ['project-create','proposal-editor'])if(el(id).open)el(id).close();}el('lead-rows').replaceChildren();el('follow-up-list').replaceChildren();if(el('lead-dialog').open)el('lead-dialog').close();}
-async function api(path,options={}){const result=await fetch('/api/crm/'+path,{...options,headers:{'Content-Type':'application/json',...options.headers},credentials:'same-origin',cache:'no-store'});const data=await result.json();if(!result.ok){if(result.status===401||result.status===403)signedOut();throw Error(data.error||'Something went wrong. Please try again.');}return data;}
+function signedOut(){authenticated=false;stopLive();el('dashboard').hidden=true;el('login').hidden=false;el('logout').hidden=true;el('live-status').hidden=true;el('account').textContent='';el('profile-open').hidden=true;if(el('profile-dialog').open)el('profile-dialog').close();leads=[];selected=null;historyVersion++;if(typeof studioProject!=='undefined'){studioProject=null;studioDirty=false;el('project-detail').hidden=true;el('project-index').hidden=false;el('client-link').value='';el('client-link-box').hidden=true;for(const id of ['project-create','proposal-editor'])if(el(id).open)el(id).close();}el('lead-rows').replaceChildren();el('follow-up-list').replaceChildren();if(el('lead-dialog').open)el('lead-dialog').close();}
+let refreshInFlight;
+function crmFetch(path,options={}){
+  return fetch('/api/crm/'+path,{...options,headers:{'Content-Type':'application/json',...options.headers},credentials:'same-origin',cache:'no-store'});
+}
+async function refreshSession(){
+  if(!refreshInFlight){
+    const refresh=async()=>{
+      const current=await crmFetch('me');
+      if(current.status!==401)return current;
+      return crmFetch('refresh',{method:'POST',body:'{}'});
+    };
+    const task=navigator.locks?navigator.locks.request('ss-crm-session',refresh):refresh();
+    refreshInFlight=task.then(result=>result.status).finally(()=>{refreshInFlight=null;});
+  }
+  return refreshInFlight;
+}
+async function api(path,options={}){
+  let result=await crmFetch(path,options);
+  if(result.status===401&&!['login','logout','refresh'].includes(path)){
+    const status=await refreshSession();
+    if(status===200)result=await crmFetch(path,options);
+    if(status>=500)throw Error('Authentication is temporarily unavailable. Try again.');
+  }
+  const data=await result.json();
+  if(!result.ok){
+    if(result.status===401||result.status===403){
+      signedOut();
+      if(location.pathname==='/crm/dashboard')location.replace('/crm/login');
+    }
+    throw Error(data.error||'Something went wrong. Please try again.');
+  }
+  return data;
+}
+function showProfile(user){
+  el('account').textContent=user.full_name||user.email;
+  el('profile-email').textContent=user.email;
+  el('profile-role').textContent=user.role;
+  el('profile-name').value=user.full_name||'';
+}
+el('profile-open').onclick=()=>el('profile-dialog').showModal();
+el('profile-close').onclick=()=>el('profile-dialog').close();
+el('profile-form').onsubmit=async event=>{
+  event.preventDefault();
+  event.submitter.disabled=true;
+  try{
+    showProfile(await api('me',{method:'PATCH',body:JSON.stringify({full_name:el('profile-name').value})}));
+    el('profile-status').textContent='Profile updated.';
+  }catch(error){el('profile-status').textContent=error.message;}
+  finally{event.submitter.disabled=false;}
+};
 function date(value){return value?new Date(value).toLocaleString(undefined,{day:'numeric',month:'short',year:'numeric',hour:'numeric',minute:'2-digit'}):'Not set';}
 function localInput(value){if(!value)return '';const d=new Date(value);return new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,16);}
 function country(code){if(!/^[A-Z]{2}$/.test(code||''))return 'Country unavailable';try{return new Intl.DisplayNames(['en'],{type:'region'}).of(code)||code;}catch{return code;}}
@@ -38,9 +87,9 @@ function connectLive(){if(!authenticated||document.hidden||live)return;el('live-
  if(!fallback)fallback=setInterval(()=>{if(authenticated&&!document.hidden)load(true);},30000);
 }
 document.addEventListener('visibilitychange',()=>{if(document.hidden){live?.close();live=null;}else if(authenticated){connectLive();load(true);}});
-async function enter(){try{const user=await api('me');if(location.pathname==='/crm/login'){location.replace('/crm/dashboard');return;}authenticated=true;el('login').hidden=true;el('dashboard').hidden=false;el('logout').hidden=false;el('account').textContent=user.email;await Promise.all([load(),integrations()]);connectLive();}catch(e){signedOut();message(e.message==='Please sign in.'?'':e.message,true);}}
+async function enter(){try{const user=await api('me');if(location.pathname==='/crm/login'){location.replace('/crm/dashboard');return;}authenticated=true;el('login').hidden=true;el('dashboard').hidden=false;el('logout').hidden=false;showProfile(user);el('profile-open').hidden=false;await Promise.all([load(),integrations()]);connectLive();}catch(e){signedOut();message(e.message==='Please sign in.'?'':e.message,true);}}
 el('login-form').onsubmit=async e=>{e.preventDefault();const button=e.currentTarget.querySelector('button');button.disabled=true;message('Signing in…');const form=new FormData(e.currentTarget);try{await api('login',{method:'POST',body:JSON.stringify({email:form.get('email'),password:form.get('password')})});el('login-form').elements.password.value='';await enter();}catch(e){message(e.message,true);}finally{button.disabled=false;}};
-el('logout').onclick=async()=>{try{await api('logout',{method:'POST',body:'{}'});signedOut();if(location.pathname==='/crm/dashboard')location.replace('/crm/login');else message('Signed out.');}catch(e){message(e.message,true);}};
+el('logout').onclick=async()=>{try{const logout=()=>api('logout',{method:'POST',body:'{}'});await (navigator.locks?navigator.locks.request('ss-crm-session',logout):logout());signedOut();if(location.pathname==='/crm/dashboard')location.replace('/crm/login');else message('Signed out.');}catch(e){message(e.message,true);}};
 el('refresh').onclick=()=>load();el('filters').onsubmit=e=>{e.preventDefault();if(loading)return;offset=0;load();};
 el('previous').onclick=()=>{if(loading)return;offset=Math.max(0,offset-50);load();};el('next').onclick=()=>{if(loading)return;offset+=50;load();};
 el('send-reminders').onclick=async()=>{el('send-reminders').disabled=true;el('reminder-result').textContent='Processing due reminders…';try{const result=await api('reminders/send',{method:'POST',body:'{}'});el('reminder-result').textContent=`${result.sent} email reminder(s) sent; ${result.failed} delivery failure(s).`;await load(true);}catch(e){el('reminder-result').textContent=e.message;}finally{el('send-reminders').disabled=!emailEnabled;}};
@@ -53,4 +102,34 @@ function eventDetail(event){const d=event.detail||{};if(event.kind==='stage')ret
 async function loadHistory(id){const version=++historyVersion;el('history-status').textContent='Loading activity…';try{const data=await api('leads/'+id+'/activity');if(version!==historyVersion||selected?.id!==id)return;el('booking-list').replaceChildren();el('activity-timeline').replaceChildren();for(const booking of data.bookings){const item=document.createElement('li'),time=document.createElement('time');item.textContent=booking.event_name+' · '+booking.status;time.textContent=booking.starts_at?date(booking.starts_at):'Booking time unavailable';if(booking.starts_at)time.dateTime=booking.starts_at;item.append(time);el('booking-list').append(item);}if(!data.bookings.length){const item=document.createElement('li');item.className='history-empty';item.textContent='No consultations linked to this lead.';el('booking-list').append(item);}for(const event of [...data.activity].reverse()){const item=document.createElement('li');item.textContent=event.summary;const detail=eventDetail(event);if(detail){const p=document.createElement('p');p.textContent=detail;item.append(p);}const time=document.createElement('time');time.dateTime=event.created_at;time.textContent=date(event.created_at)+(event.actor_id?' · Team member':' · System');item.append(time);el('activity-timeline').append(item);}el('history-status').textContent=data.activity.length===100?'Showing the latest 100 activity records.':data.activity.length?'':'No activity recorded yet.';}catch(e){if(version===historyVersion)el('history-status').textContent=e.message;}}
 el('close-dialog').onclick=()=>el('lead-dialog').close();el('lead-dialog').addEventListener('close',()=>{historyVersion++;selected=null;});el('lead-form').addEventListener('input',()=>{formDirty=true;});
 el('lead-form').onsubmit=async e=>{e.preventDefault();const lead=selected;if(!lead)return;const form=e.currentTarget,button=form.querySelector('button');button.disabled=true;el('save-status').textContent='Saving…';try{const result=await api('leads/'+lead.id,{method:'PATCH',body:JSON.stringify({stage:form.elements.stage.value,notes:form.elements.notes.value,follow_up_at:form.elements.follow_up_at.value?new Date(form.elements.follow_up_at.value).toISOString():null,proposal_title:form.elements.proposal_title.value,proposal_status:form.elements.proposal_status.value,proposal_currency:form.elements.proposal_currency.value,proposal_url:form.elements.proposal_url.value,proposal_amount:form.elements.proposal_amount.value===''?null:Number(form.elements.proposal_amount.value),updated_at:lead.updated_at})});if(selected?.id===lead.id){selected=result.lead;formDirty=false;el('save-status').textContent='Changes saved.';await loadHistory(lead.id);}await load(true);}catch(e){el('save-status').textContent=e.message;}finally{button.disabled=false;}};
-enter();
+const recoveryPath=location.pathname.split('/').pop();
+if(['forgot-password','reset-password'].includes(recoveryPath)){
+  const isReset=recoveryPath==='reset-password';
+  const code=new URLSearchParams(location.search).get('code');
+  if(location.search||location.hash)history.replaceState(null,'',location.pathname);
+  el('login').hidden=true;
+  el('main').append(el('recovery-page'));
+  el('recovery-page').hidden=false;
+  el('recovery-title').textContent=isReset?'Choose a new password':'Forgot your password?';
+  el('recovery-email-label').hidden=isReset;
+  el('recovery-email').required=!isReset;
+  el('recovery-password-label').hidden=!isReset;
+  el('recovery-password').required=isReset;
+  el('recovery-submit').textContent=isReset?'Update password':'Send recovery link';
+  if(isReset&&!code){
+    el('recovery-form').hidden=true;
+    el('recovery-status').textContent='This recovery link is invalid or expired. Request a new link.';
+  }
+  el('recovery-form').onsubmit=async event=>{
+    event.preventDefault();
+    event.submitter.disabled=true;
+    try{
+      const body=isReset?{code,password:el('recovery-password').value}:{email:el('recovery-email').value.trim()};
+      await api(recoveryPath,{method:'POST',body:JSON.stringify(body)});
+      el('recovery-form').reset();
+      el('recovery-status').textContent=isReset?'Password updated. Return to sign in.':'If the account exists, check your email. Open the recovery link in this browser.';
+      if(isReset)el('recovery-form').hidden=true;
+    }catch(error){el('recovery-status').textContent=error.message;}
+    finally{event.submitter.disabled=false;}
+  };
+}else enter();

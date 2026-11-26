@@ -4,7 +4,7 @@ const env={SUPABASE_URL:'https://example.supabase.co',SUPABASE_PUBLISHABLE_KEY:'
 const call=(path,method='GET',body,headers={})=>worker.fetch(new Request('https://agency.test'+path,{method,headers:{origin:'https://agency.test',...headers},...(body?{body:JSON.stringify(body)}:{})}),env);
 const session={cookie:'__Host-ss-crm=valid-token'};
 const original=globalThis.fetch;let member=true,tokenValid=true,updateRows=true,intakeFail=false,mailFail=false,calls=[];
-globalThis.fetch=async(url,options={})=>{url=String(url);calls.push({url,options});if(url.includes('/auth/v1/token'))return Response.json({access_token:'valid-token',expires_in:3600,user:{id:'staff-id'}});if(url.includes('/auth/v1/user'))return Response.json({id:'staff-id',email:'staff@example.com'},{status:tokenValid?200:401});if(url.includes('/crm_staff'))return Response.json(member?[{user_id:'staff-id',salesos_role:'owner'}]:[]);if(url.includes('/crm_summary'))return Response.json({total:2,new:1,open:2,won:0,overdue:1});if((url.includes('/crm_leads')||url.includes('/functions/v1/crm-inquiry'))){if(options.method==='POST')return new Response('',{status:intakeFail?500:201});if(options.method==='PATCH')return Response.json(updateRows?[{id:'lead-id',stage:'won'}]:[]);return Response.json([],{headers:{'content-range':'0-0/0'}});}if(url.includes('formspree'))return new Response('',{status:mailFail?500:200});throw Error('Unexpected request '+url);};
+globalThis.fetch=async(url,options={})=>{url=String(url);calls.push({url,options});if(url.includes('/auth/v1/recover'))return Response.json({});if(url.includes('/auth/v1/token?grant_type=pkce')&&JSON.parse(options.body).auth_code!=='valid-code')return Response.json({}, {status:400});if(url.includes('/auth/v1/logout'))return new Response(null,{status:204});if(url.includes('/auth/v1/token'))return Response.json({access_token:'valid-token',refresh_token:'rotated-token',expires_in:3600,user:{id:'staff-id'}});if(url.includes('/auth/v1/user'))return Response.json({id:'staff-id',email:'staff@example.com',user_metadata:JSON.parse(options.body||'{}').data},{status:tokenValid?200:401});if(url.includes('/crm_staff'))return Response.json(member?[{user_id:'staff-id',salesos_role:'owner'}]:[]);if(url.includes('/crm_summary'))return Response.json({total:2,new:1,open:2,won:0,overdue:1});if((url.includes('/crm_leads')||url.includes('/functions/v1/crm-inquiry'))){if(options.method==='POST')return new Response('',{status:intakeFail?500:201});if(options.method==='PATCH')return Response.json(updateRows?[{id:'lead-id',stage:'won'}]:[]);return Response.json([],{headers:{'content-range':'0-0/0'}});}if(url.includes('formspree'))return new Response('',{status:mailFail?500:200});throw Error('Unexpected request '+url);};
 try{
   for(const p of ['/crm','/crm.css','/crm.js']){const r=await call(p);assert.equal(r.status,200);assert.equal(r.headers.get('Cache-Control'),'no-store');assert.equal(r.headers.get('X-Robots-Tag'),'noindex, nofollow');assert.ok(!(await r.text()).includes('sb_secret_test'));}
   assert.equal((await call('/api/crm/leads')).status,401);assert.equal(calls.length,0);
@@ -23,5 +23,24 @@ try{
   intakeFail=true;assert.equal((await call('/api/inquiry','POST',inquiry)).status,502);intakeFail=false;
   env.LEAD_WEBHOOK_URL='https://formspree.io/f/test';mailFail=true;assert.equal((await call('/api/inquiry','POST',inquiry)).status,200);
   assert.equal((await call('/api/crm/logout','POST',{},session)).headers.get('set-cookie').includes('Max-Age=0'),true);
+  const renewed=await call('/api/crm/refresh','POST',{}, {cookie:'__Host-ss-crm=expired~refresh-token'});
+  assert.equal(renewed.status,200);
+  assert.match(renewed.headers.get('set-cookie'),/valid-token~rotated-token/);
+  assert.equal(JSON.parse(calls.findLast(c=>c.url.includes('grant_type=refresh_token')).options.body).refresh_token,'refresh-token');
+  assert.equal((await call('/api/crm/me','PATCH',{full_name:'New Name',role:'owner'},session)).status,400);
+  const profile=await call('/api/crm/me','PATCH',{full_name:' New Name '},session);
+  assert.deepEqual(await profile.json(),{email:'staff@example.com',role:'owner',full_name:'New Name'});
+  assert.ok(calls.some(c=>c.url.includes('/logout?scope=local')));
+  const recovery=await call('/api/crm/forgot-password','POST',{email:'staff@example.com'});
+  assert.equal(recovery.status,200);
+  const recoveryCookie=recovery.headers.get('set-cookie').split(';')[0];
+  const verifier=recoveryCookie.split('=')[1];
+  const challenge=Buffer.from(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(verifier))).toString('base64url');
+  assert.equal(JSON.parse(calls.findLast(c=>c.url.includes('/recover?')).options.body).code_challenge,challenge);
+  const reset={code:'valid-code',password:'mock-password-long'};
+  assert.equal((await call('/api/crm/reset-password','POST',reset)).status,400);
+  assert.equal((await call('/api/crm/reset-password','POST',{...reset,code:'invalid-code'},{cookie:recoveryCookie})).status,400);
+  assert.equal((await call('/api/crm/reset-password','POST',reset,{cookie:recoveryCookie})).status,200);
+  assert.ok(calls.some(c=>c.url.includes('/logout?scope=global')));
   console.log('CRM passed: private cookies, origin enforcement, staff gating, expired sessions, RLS-scoped requests, filters, stale-write protection, intake durability, and notification failure.');
 }finally{globalThis.fetch=original;}
