@@ -31,8 +31,8 @@ async function crmRoute(request,env,path) {
     if(!auth.ok) return crmReply({error:auth.status===429?'Too many attempts. Try again later.':'Unable to sign in with those details.'},auth.status===429?429:401);
     const session=await auth.json();
     if(typeof session.access_token!=='string'||!session.user?.id) return crmReply({error:'Unable to sign in.'},502);
-    const membership=await crmSupabase(env,'/rest/v1/crm_staff?select=user_id&user_id=eq.'+encodeURIComponent(session.user.id),{},session.access_token);
-    if(!membership.ok || !(await membership.json()).length) return crmReply({error:'This account does not have CRM access.'},403);
+    const membership=await crmSupabase(env,'/rest/v1/crm_staff?select=user_id,salesos_role&user_id=eq.'+encodeURIComponent(session.user.id),{},session.access_token);
+    if(!membership.ok || !['owner','admin'].includes((await membership.json())[0]?.salesos_role)) return crmReply({error:'This account does not have CRM access.'},403);
     const age=Math.max(1,Math.min(3600,Number(session.expires_in)||3600));
     return crmReply({ok:true},200,{'Set-Cookie':'__Host-ss-crm='+encodeURIComponent(session.access_token)+'; HttpOnly; Secure; SameSite=Strict; Path=/; Max-Age='+age});
   }
@@ -45,7 +45,7 @@ async function crmRoute(request,env,path) {
   const {token,user}=session;
   const studio=await studioRoute(request,env,path,token);if(studio)return studio;
   const feature=await crmFeatureRoute(request,env,path,token);if(feature)return feature;
-  if(path==='/api/crm/me' && request.method==='GET') return crmReply({email:user.email});
+  if(path==='/api/crm/me' && request.method==='GET') return crmReply({email:user.email,role:session.role});
   if(path==='/api/crm/summary' && request.method==='GET') {
     const result=await crmSupabase(env,'/rest/v1/rpc/crm_summary',{method:'POST',body:'{}'},token);
     if(!result.ok) return crmReply({error:'Unable to load dashboard totals.'},502);
@@ -86,8 +86,9 @@ async function crmAuthenticate(request,env){
   const userResult=await crmSupabase(env,'/auth/v1/user',{},token);
   if(!userResult.ok) return crmReply({error:'Your session expired. Please sign in again.'},401);
   const user=await userResult.json();
-  const member=await crmSupabase(env,'/rest/v1/crm_staff?select=user_id&user_id=eq.'+encodeURIComponent(user.id),{},token);
-  if(!member.ok || !(await member.json()).length) return crmReply({error:'CRM access is restricted to authorized staff.'},403);
-  return {token,user};
+  const member=await crmSupabase(env,'/rest/v1/crm_staff?select=user_id,salesos_role&user_id=eq.'+encodeURIComponent(user.id),{},token);
+  const role=member.ok?(await member.json())[0]?.salesos_role:null;
+  if(!['owner','admin'].includes(role)) return crmReply({error:'CRM access is restricted to authorized staff.'},403);
+  return {token,user,role};
 }
 export {crmRoute,crmReady,crmIntakeReady,crmSaveInquiry};
