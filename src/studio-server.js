@@ -19,7 +19,7 @@ async function studioRoute(request,env,path,token){
  }
  if(part[0]==='pipeline'&&method==='GET'){
  const stage=url.searchParams.get('stage');if(!crmStages.includes(stage))return bad('Choose a pipeline stage');
- return crmReply(await get('crm_leads',{select:'id,name,email,company,service,stage,follow_up_at,proposal_amount,proposal_currency,updated_at',stage:'eq.'+stage,order:'created_at.desc,id.asc',limit:'100',offset:String(Math.max(0,Math.min(100000,parseInt(url.searchParams.get('offset'))||0)))}));
+ return crmReply(await get('crm_leads',{select:'id,name,email,company,service,stage,follow_up_at,proposal_amount,proposal_currency,updated_at',stage:'eq.'+stage,order:'created_at.desc,id.asc',limit:url.searchParams.get('limit')==='1'?'1':'100',offset:String(Math.max(0,Math.min(100000,parseInt(url.searchParams.get('offset'))||0)))}));
  }
  if(part[0]==='stage'&&studioId(part[1])&&method==='PATCH'){
  if(!crmStages.includes(d.stage)||!studioStamp(d.updated_at))return bad('Invalid stage update');const r=await studioRest(env,token,'crm_leads',{id:'eq.'+part[1],updated_at:'eq.'+d.updated_at,select:'*'},'PATCH',{stage:d.stage});return r.rows.length?crmReply({lead:r.rows[0]}):crmReply({error:'This lead changed. Refresh the board before moving it again.'},409);

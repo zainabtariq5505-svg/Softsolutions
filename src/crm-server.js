@@ -40,13 +40,9 @@ async function crmRoute(request,env,path) {
     if(request.method!=='POST') return crmReply({error:'Method not allowed'},405);
     return crmReply({ok:true},200,{'Set-Cookie':'__Host-ss-crm=; HttpOnly; Secure; SameSite=Strict; Path=/; Max-Age=0'});
   }
-  let token;try{token=decodeURIComponent((request.headers.get('cookie')||'').split(';').map(s=>s.trim()).find(s=>s.startsWith('__Host-ss-crm='))?.slice(14)||'');}catch{}
-  if(!token) return crmReply({error:'Please sign in.'},401);
-  const userResult=await crmSupabase(env,'/auth/v1/user',{},token);
-  if(!userResult.ok) return crmReply({error:'Your session expired. Please sign in again.'},401);
-  const user=await userResult.json();
-  const member=await crmSupabase(env,'/rest/v1/crm_staff?select=user_id&user_id=eq.'+encodeURIComponent(user.id),{},token);
-  if(!member.ok || !(await member.json()).length) return crmReply({error:'CRM access is restricted to authorized staff.'},403);
+  const session=await crmAuthenticate(request,env);
+  if(session instanceof Response)return session;
+  const {token,user}=session;
   const studio=await studioRoute(request,env,path,token);if(studio)return studio;
   const feature=await crmFeatureRoute(request,env,path,token);if(feature)return feature;
   if(path==='/api/crm/me' && request.method==='GET') return crmReply({email:user.email});
@@ -83,4 +79,15 @@ async function crmRoute(request,env,path) {
   return crmReply({error:'Not found'},404);
 }
 
+async function crmAuthenticate(request,env){
+  if(!crmReady(env))return crmReply({error:'CRM connection is not configured yet.'},503);
+  let token;try{token=decodeURIComponent((request.headers.get('cookie')||'').split(';').map(s=>s.trim()).find(s=>s.startsWith('__Host-ss-crm='))?.slice(14)||'');}catch{}
+  if(!token) return crmReply({error:'Please sign in.'},401);
+  const userResult=await crmSupabase(env,'/auth/v1/user',{},token);
+  if(!userResult.ok) return crmReply({error:'Your session expired. Please sign in again.'},401);
+  const user=await userResult.json();
+  const member=await crmSupabase(env,'/rest/v1/crm_staff?select=user_id&user_id=eq.'+encodeURIComponent(user.id),{},token);
+  if(!member.ok || !(await member.json()).length) return crmReply({error:'CRM access is restricted to authorized staff.'},403);
+  return {token,user};
+}
 export {crmRoute,crmReady,crmIntakeReady,crmSaveInquiry};
