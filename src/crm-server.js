@@ -125,6 +125,15 @@ async function crmRoute(request,env,path) {
   const session=await crmAuthenticate(request,env);
   if(session instanceof Response)return session;
   const {token,user}=session;
+  if(path==='/api/crm/metrics' && request.method==='GET'){
+    const parseDay=value=>/^\d{4}-\d{2}-\d{2}$/.test(value||'')&&Number.isFinite(Date.parse(value))&&new Date(value).toISOString().slice(0,10)===value?Date.parse(value):NaN;
+    const start=parseDay(url.searchParams.get('start'));
+    const end=parseDay(url.searchParams.get('end'));
+    if(!Number.isFinite(start)||!Number.isFinite(end)||end<start||end-start>365*86400000)return crmReply({error:'Choose a valid date range up to 366 days.'},400);
+    const result=await crmSupabase(env,'/rest/v1/rpc/salesos_dashboard',{method:'POST',body:JSON.stringify({range_start:new Date(start).toISOString(),range_end:new Date(end+86400000).toISOString()})},token);
+    if(!result.ok)return crmReply({error:'Dashboard data is temporarily unavailable.'},502);
+    return crmReply(await result.json());
+  }
   const studio=await studioRoute(request,env,path,token);if(studio)return studio;
   const feature=await crmFeatureRoute(request,env,path,token);if(feature)return feature;
   if(path==='/api/crm/me' && request.method==='GET') return crmReply(crmProfile(user,session.role));

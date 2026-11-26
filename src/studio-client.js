@@ -61,3 +61,56 @@ el('proposal-publish').onclick=e=>studioDo(e.currentTarget,async()=>{if(!el('pro
 el('proposal-print').onclick=()=>{if(studioProposal)window.open('/api/crm/studio/proposals/'+studioProposal.id+'/print','_blank','noopener');};el('proposal-copy').onclick=()=>{const p=studioProposal;el('proposal-editor').close();studioEditProposal({...p,id:undefined,status:'draft'});studioProposal=null;el('proposal-publish').hidden=true;el('proposal-print').hidden=true;};
 el('proposal-editor').addEventListener('close',()=>{studioSchedule();});
 studioSwitch('today');
+
+const metricsFields=[
+ ['total_leads','Total leads (all time)'],['new_leads','New leads'],['qualified_leads','Qualified leads'],
+ ['emails_sent','Emails sent'],['delivered','Delivered emails'],['replies','Replies received'],['positive_replies','Positive replies'],
+ ['meetings','Active bookings made'],['won','Deals won'],['revenue','Revenue generated']
+];
+function setMetricDates(){
+  const preset=el('metrics-period').value;
+  if(preset==='custom')return;
+  const now=Date.now();
+  el('metrics-start').value=new Date(now-(Number(preset)-1)*86400000).toISOString().slice(0,10);
+  el('metrics-end').value=new Date(now).toISOString().slice(0,10);
+}
+function metricList(id,rows,format,empty){
+  el(id).replaceChildren(...(rows.length?rows.map(row=>sn('li',format(row))):[sn('li',empty)]));
+}
+let metricVersion=0;
+async function loadSalesMetrics(){
+  const version=++metricVersion;
+  el('metrics-status').textContent='Loading sales performance…';
+  el('metrics-results').hidden=true;
+  try{
+    const query=new URLSearchParams({start:el('metrics-start').value,end:el('metrics-end').value});
+    const data=await api('metrics?'+query);
+    if(version!==metricVersion||!authenticated)return;
+    el('metrics-kpis').replaceChildren(...metricsFields.map(([key,label])=>{
+      const cell=sn('div');
+      cell.append(sn('dt',label),sn('dd',data[key]==null?'Unavailable':String(data[key])));
+      return cell;
+    }));
+    const chart=el('metrics-acquisition');
+    const max=Math.max(1,...data.acquisition.map(row=>row.total));
+    chart.replaceChildren(...data.acquisition.map(row=>{
+      const label=sn('label',row.day+' · '+row.total+' leads');
+      const bar=sn('meter');bar.max=max;bar.value=row.total;
+      label.append(bar);
+      return label;
+    }));
+    if(!data.acquisition.length)chart.append(sn('p','No leads acquired in this period.'));
+    metricList('metrics-pipeline',data.pipeline,row=>row.stage+' · '+row.total+' deals · '+(row.currency&&row.value!=null?money(row.value,row.currency):'Value unavailable'),'No deals created in this period.');
+    metricList('metrics-leads',data.leads,row=>row.name+' · '+row.stage+' · '+date(row.created_at),'No leads in this period.');
+    metricList('metrics-tasks',data.tasks,row=>row.title+' · '+date(row.due_at),'No upcoming tasks.');
+    metricList('metrics-activity',data.activity,row=>row.summary+' · '+date(row.created_at),'No activity in this period.');
+    el('metrics-results').hidden=false;
+    el('metrics-status').textContent='';
+  }catch(error){
+    if(version===metricVersion)el('metrics-status').textContent=error.message;
+  }
+}
+el('metrics-period').onchange=()=>{setMetricDates();if(el('metrics-period').value!=='custom')loadSalesMetrics();};
+for(const id of ['metrics-start','metrics-end'])el(id).onchange=()=>{el('metrics-period').value='custom';};
+el('metrics-form').onsubmit=event=>{event.preventDefault();loadSalesMetrics();};
+setMetricDates();
